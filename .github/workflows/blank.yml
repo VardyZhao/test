@@ -32,5 +32,40 @@ jobs:
       # Runs a set of commands using the runners shell
       - name: check
         run: |
-          te=$(php -r "echo 'Hello world';")
-          echo $te"!"
+          php -r '
+<?php
+# function extractErrorCodesFromHtml($html) {
+#     $codes = [];
+#     $dom = new DOMDocument();
+#     @$dom->loadHTML($html);
+#     $xpath = new DOMXPath($dom);
+#     $rows = $xpath->query("//tr/td[1]");
+#     foreach ($rows as $row) {
+#         $code = trim($row->textContent);
+#         if (is_numeric($code)) {
+#             $codes[] = $code;
+#         }
+#     }
+#     return array_unique($codes);
+# }
+
+# // 从文件中读取错误码
+# $newCodes = array_map('trim', file("error_codes.txt"));
+# $newCodes = array_unique($newCodes);
+
+# // 读取 Confluence 数据
+# $confluenceData = json_decode(file_get_contents("confluence_data.json"), true);
+# $htmlContent = $confluenceData["body"]["storage"]["value"];
+# $existingCodes = extractErrorCodesFromHtml($htmlContent);
+$newCodes = [1,2];
+$existingCodes = [2,3];
+// 比较错误码
+$duplicates = array_intersect($newCodes, $existingCodes);
+if (count($duplicates) > 0) {
+    echo "Error: Detected new error codes in README.md that already exist in Confluence: " . implode(", ", $duplicates) . "\n";
+    exit(1);
+} else {
+    echo "No conflicting error codes detected.\n";
+}
+'  
+
