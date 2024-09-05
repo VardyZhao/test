@@ -33,4 +33,4 @@ jobs:
       - name: check
         run: |
           te=$(php -r "echo 'Hello world';")
-          echo $te
+          echo $te"!"
