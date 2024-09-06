@@ -11,12 +11,14 @@ if [ -n "$duplicate_code" ]; then
 fi
 
 
-# Step 3: 获取本次提交新增和删除的错误码并忽略左右空格
+
+# 通过git diff获取本次提交的改动
 new_error_codes=$(git diff --cached ERROR_CODE.md | grep '^+|\s*[0-9]' | awk -F '|' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
 deleted_error_codes=$(git diff --cached ERROR_CODE.md | grep '^-|\s*[0-9]' | awk -F '|' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
 
 
 echo $new_error_codes
+echo $deleted_error_codes
 exit 1
 
 # Step 4: 如果没有删除的错误码，且有新增的错误码，表示是新增
