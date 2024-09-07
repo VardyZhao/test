@@ -67,12 +67,12 @@ if [ -n "$deleted_error_codes" ] || [ -n "$new_error_codes" ]; then
       duplicate_codes+=("$remote_code")
     fi
   done
-
   if [ -n "$duplicate_codes" ]; then
     echo "Error: Confluence has been updated to the latest version. Please sync the error codes from Confluence to your local environment first: $duplicate_codes"
     exit 1
   fi
 
+  # 更新confluence，中文字符shell不好处理，要用python
   if command -v py &> /dev/null; then
       PYTHON_CMD="py"
   elif command -v py3 &> /dev/null; then
@@ -138,7 +138,11 @@ fi
 
 
 # 测试用例
-# 1、本地删除，看看
+# 1、本地删除，confluence也要删除
+# 2、confluence比本地的code多，提示要先更新
+# 3、本地新增，本地不允许重复
+# 4、本地新增，confluence上面有，不允许提交
+# 5、本地修改，更新confluence
 
 
 
