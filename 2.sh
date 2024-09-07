@@ -1,21 +1,5 @@
 #!/bin/bash
 
-# 将 Markdown 表格转换为 HTML 表格 (只转换表内容，不转换表头)
-convert_to_html() {
-  awk '
-  BEGIN { in_table = 0 }
-  /^\| Code \| CN \| EN \|/ { in_table = 0 }
-  /^\|/ {
-    split($0, fields, "|")
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", fields[2])
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", fields[3])
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", fields[4])
-    if (fields[2] ~ /^-/) { next }
-    print "<tr><td><p>" fields[2] "</p></td><td><p>" fields[3] "</p></td><td><p>" fields[4] "</p></td></tr>"
-  }
-  '
-}
-
 # 提取 ERROR_CODE.md
 error_codes_in_md=$(grep '^|\s*[0-9]' ERROR_CODE.md | awk -F '|' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
 
@@ -89,28 +73,45 @@ if [ -n "$deleted_error_codes" ] || [ -n "$new_error_codes" ]; then
     exit 1
   fi
 
-  # 把本地的ERROR_CODE.md更新到conflunce上面
-  html_table=$(echo "$error_code_table" | convert_to_html)
-	version_number=$(echo "$confluence_data" | grep -o '"number":[0-9]*' | awk -F: '{print $2}')
-	new_version_number=$((version_number + 1))
-	current_html_content=$(echo "$confluence_data" | grep -oP '{"representation":"storage","value":"\K.*?(?=")"}},' | sed 's/...,$//')
-	updated_html=$(replace_table_content "$current_html_content" "$html_table")
-	python -c '
+  if command -v py &> /dev/null; then
+      PYTHON_CMD="py"
+  elif command -v py3 &> /dev/null; then
+      PYTHON_CMD="py3"
+  elif command -v python3 &> /dev/null; then
+      PYTHON_CMD="python3"
+  elif command -v python &> /dev/null; then
+      PYTHON_CMD="python"
+  else
+      echo "Python is not installed on this system.Can't update Confluence document,Please update Confluence document manually"
+      exit 1
+  fi
+	$PYTHON_CMD -c '
 import sys
-import requests
+import http.client
 import json
+import re
 
-content=sys.argv[1].replace("\"\"", "\"\"")
-content=content.replace("\\\"", "\"")
-version_number=sys.argv[2]
-url = "https://thebidgroup.atlassian.net/wiki/api/v2/pages/3333423226"
+conflunce_data=json.loads(sys.argv[1])
+version_number=conflunce_data["version"]["number"]+1
+with open("ERROR_CODE.md", "r", encoding="utf-8") as file:
+    lines=file.readlines()
+table_lines=lines[2:]
+table_data=[re.split(r"\s*\|\s*", line.strip())[1:-1] for line in table_lines if "|" in line]
+html_content="<table data-table-width=\"1800\" data-layout=\"default\" ac:local-id=\"8cfa5e45-3eee-441b-9847-85c0fb3af991\"><tbody>"
+for row in table_data:
+    html_content+="<tr>"
+    for cell in row:
+        html_content+=f"<td><p>{cell.strip()}</p></td>"
+    html_content+="</tr>"
+html_content+="</tbody></table>"
+
 payload = json.dumps({
     "id": "3333423226",
     "status": "current",
     "title": "Backend Error Code",
     "body": {
         "representation": "storage",
-        "value": content
+        "value": html_content
     },
     "version": {
         "number": version_number,
@@ -122,26 +123,22 @@ headers = {
     "Accept": "application/json",
     "Authorization": "Basic dmFyZHkuemhhb0BsaWZlYnl0ZS5pbzpBVEFUVDN4RmZHRjBaS0ROSHY5VGh5My1abzhfMDRLb1dIZ0tJMUdWRkpKMEJYRUx0Q1dqWERONXd6ckt3SDdUcUVnajRJbWhiV0pZSHhSb1pHZXJVZ1B4MGpmNWJNeGtwc1piUkNuSndDWVBRZG1BWEw5dHNmZ2tJelFBLTQ1UnRCdGd6bkoyMmY5M3ZvV044RldDazdOVjNxVVdHdzZ5ZWRzTk1qaVd1OTR6UzZubzdkb0ZNcnc9QzZFMThENEM="
 }
-
-response = requests.request("PUT", url, headers=headers, data=payload)
-print(payload)
-if response.status_code == 200:
+conn = http.client.HTTPSConnection("thebidgroup.atlassian.net")
+conn.request("PUT", "/wiki/api/v2/pages/3333423226", body=payload, headers=headers)
+response = conn.getresponse()
+conn.close()
+data = response.read()
+if response.status == 200:
     print("Confluence content updated successfully.")
 else:
-    print(f"Failed to update Confluence content: {response.status_code}")
-    sys.exit(1)
-	' "$updated_html" "$new_version_number"
+    print(f"Failed to update Confluence content: {response.status}")
+    exit(1)
+' "$confluence_data"
 fi
 
-echo $duplicate_codes
-echo "===="
-echo $confluence_codes
-echo "===="
-echo $deleted_codes
-echo "===="
-echo $new_codes
 
-
+# 测试用例
+# 1、本地删除，看看
 
 
 
