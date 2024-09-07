@@ -21,19 +21,13 @@ if [ -n "$deleted_error_codes" ] || [ -n "$new_error_codes" ]; then
   # 如果是删除，只会有一个-，不需要检查confluence
   updated_codes=()
   new_codes=()
-  flag=0
   for new_code in $new_error_codes; do
-      flag=0
-      for deleted_code in $deleted_error_codes; do
-          if [ "$new_code" == "$deleted_code" ]; then
-              updated_codes+=("$new_code")
-              flag=1
-              break
-          fi
-      done
-      if [ $flag == 0 ]; then
-          new_codes+=("$new_code")
-      fi
+    echo "$deleted_error_codes" | grep -q "$new_code"
+    if echo "$deleted_error_codes" | grep -q "$new_code"; then
+      updated_codes+=("$new_code")
+    else
+      new_codes+=("$new_code")
+    fi
   done
   # 检查conflunce和ERROR_CODE的差异
   confluence_data=$(curl -s --location 'https://thebidgroup.atlassian.net/wiki/api/v2/pages/3333423226?body-format=STORAGE' \
@@ -61,6 +55,8 @@ echo "3======="
 echo $new_error_codes
 echo "4======="
 echo $deleted_error_codes
+echo "5======="
+echo $duplucate_confluence_codes
 
 
 
