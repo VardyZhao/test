@@ -72,7 +72,9 @@ if [ -n "$deleted_error_codes" ] || [ -n "$new_error_codes" ]; then
     exit 1
   fi
 
-  # 更新confluence，中文字符shell不好处理，要用python
+  PYTHON_CMD=""
+  PHP_CMD=""
+  # 更新confluence，中文字符shell不好处理，要用python或者php
   if command -v py &> /dev/null; then
       PYTHON_CMD="py"
   elif command -v py3 &> /dev/null; then
@@ -81,11 +83,18 @@ if [ -n "$deleted_error_codes" ] || [ -n "$new_error_codes" ]; then
       PYTHON_CMD="python3"
   elif command -v python &> /dev/null; then
       PYTHON_CMD="python"
+  elif command -v php &> /dev/null; then
+      PHP_CMD="php"
+  elif command -v php7 &> /dev/null; then
+      PHP_CMD="php7"
+  elif command -v php8 &> /dev/null; then
+      PHP_CMD="php8"
   else
-      echo "Python is not installed on this system.Can't update Confluence document,Please update Confluence document manually"
+      echo "Python or PHP is not installed on this system.Can't update Confluence document,Please update Confluence document manually"
       exit 1
   fi
-	$PYTHON_CMD -c '
+  if [ -n "$PYTHON_CMD" ]; then
+    $PYTHON_CMD -c '
 import sys
 import http.client
 import json
@@ -134,6 +143,68 @@ else:
     print(f"Failed to update Confluence content: {response.status}")
     exit(1)
 ' "$confluence_data"
+  elif [ -n "$PHP_CMD" ]; then
+    $PHP_CMD -r '
+<?php
+$confluence_data = json_decode($argv[1], true);
+$version_number = $confluence_data["version"]["number"] + 1;
+$table_data = [];
+$lines = file("ERROR_CODE.md", FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+$table_lines = array_slice($lines, 2);
+foreach ($table_lines as $line) {
+    if (strpos($line, "|") !== false) {
+        // 使用正则表达式来处理每一行并将其转为表格
+        $row = preg_split("/\s*\|\s*/", trim($line));
+        array_shift($row);
+        array_pop($row);
+        $table_data[] = $row;
+    }
+}
+$html_content = "<table data-table-width=\"1800\" data-layout=\"default\" ac:local-id=\"8cfa5e45-3eee-441b-9847-85c0fb3af991\"><tbody>";
+foreach ($table_data as $row) {
+    $html_content .= "<tr>";
+    foreach ($row as $cell) {
+        $html_content .= ""<td><p> . htmlspecialchars($cell) . "</p></td>";
+    }
+    $html_content .= "</tr>";
+}
+$html_content .= "</tbody></table>";
+$payload = json_encode([
+    "id" => "3333423226",
+    "status" => "current",
+    "title" => "Backend Error Code",
+    "body" => [
+        "representation" => "storage",
+        "value" => $html_content
+    ],
+    "version" => [
+        "number" => $version_number,
+        "message" => "Git commit with update doc",
+    ]
+]);
+$headers = [
+    "Content-Type: application/json",
+    "Accept: application/json",
+    "Authorization: Basic dmFyZHkuemhhb0BsaWZlYnl0ZS5pbzpBVEFUVDN4RmZHRjBaS0ROSHY5VGh5My1abzhfMDRLb1dIZ0tJMUdWRkpKMEJYRUx0Q1dqWERONXd6ckt3SDdUcUVnajRJbWhiV0pZSHhSb1pHZXJVZ1B4MGpmNWJNeGtwc1piUkNuSndDWVBRZG1BWEw5dHNmZ2tJelFBLTQ1UnRCdGd6bkoyMmY5M3ZvV044RldDazdOVjNxVVdHdzZ5ZWRzTk1qaVd1OTR6UzZubzdkb0ZNcnc9QzZFMThENEM="
+];
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, "https://thebidgroup.atlassian.net/wiki/api/v2/pages/3333423226");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+$response = curl_exec($ch);
+$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+if ($httpcode == 200) {
+    echo "Confluence content updated successfully.\n";
+} else {
+    echo "Failed to update Confluence content: " . $httpcode . "\n";
+    exit(1);
+}
+?>
+' "$confluence_data"
+  fi
 fi
 
 
