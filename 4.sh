@@ -21,33 +21,33 @@ deleted_error_codes=$(git diff --cached "$error_code_file" | grep -E '^\-\s*\|\s
 updated_error_codes=$(git diff --cached --ignore-all-space -U0 "$error_code_file" | awk '
   /^-/ {
     old = $0;
-    old_code = "";
-    old_desc = "";
-    if (match(old, /\| *[0-9xX]+ *\| *[^|]+ *\|/, arr)) {
-      split(old, parts, "|");
-      old_code = parts[2];
-      old_desc = parts[3];
-      gsub(/^ +| +$/, "", old_code);
-      gsub(/^ +| +$/, "", old_desc);
-      old_entries[old_code] = old_desc;
+    split(old, parts, "|");
+    if (length(parts) >= 3) {
+      old_code = trim(parts[2]);
+      old_desc = trim(parts[3]);
+      if (index(old_code, "-") == 0) {
+        old_entries[old_code] = old_desc;
+      }
     }
   }
   /^\+/ {
     new = $0;
-    new_code = "";
-    new_desc = "";
-    if (match(new, /\| *[0-9xX]+ *\| *[^|]+ *\|/, arr)) {
-      split(new, parts, "|");
-      new_code = parts[2];
-      new_desc = parts[3];
-      gsub(/^ +| +$/, "", new_code);
-      gsub(/^ +| +$/, "", new_desc);
-      new_entries[new_code] = new_desc;
-
-      if (old_entries[new_code] && old_entries[new_code] != new_desc) {
-        print new_code;
+    split(new, parts, "|");
+    if (length(parts) >= 3) {
+      new_code = trim(parts[2]);
+      new_desc = trim(parts[3]);
+      if (index(new_code, "-") == 0) {
+        new_entries[new_code] = new_desc;
+        if (old_entries[new_code] && old_entries[new_code] != new_desc) {
+          print new_code;
+        }
       }
     }
+  }
+
+  function trim(str) {
+    gsub(/^[ \t]+|[ \t]+$/, "", str);
+    return str;
   }
 ')
 
